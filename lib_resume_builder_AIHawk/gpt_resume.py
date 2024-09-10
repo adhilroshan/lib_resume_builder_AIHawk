@@ -12,6 +12,7 @@ from langchain_core.prompt_values import StringPromptValue
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_text_splitters import TokenTextSplitter
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -22,6 +23,8 @@ import logging
 import re  # For regex parsing, especially in `parse_wait_time_from_error_message`
 from requests.exceptions import HTTPError as HTTPStatusError  # Handling HTTP status errors
 import openai
+import ollama
+
 
 load_dotenv()
 
@@ -45,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 class LLMLogger:
     
-    def __init__(self, llm: ChatOpenAI):
+    def __init__(self, llm: ChatOllama):
         self.llm = llm
 
     @staticmethod
@@ -103,7 +106,7 @@ class LLMLogger:
 
 class LoggerChatModel:
 
-    def __init__(self, llm: ChatOpenAI):
+    def __init__(self, llm: ChatOllama):
         self.llm = llm
 
 
@@ -118,7 +121,7 @@ class LoggerChatModel:
                 parsed_reply = self.parse_llmresult(reply)
                 LLMLogger.log_request(prompts=messages, parsed_reply=parsed_reply)
                 return reply
-            except (openai.RateLimitError, HTTPStatusError) as err:
+            except (ollama.RequestError, HTTPStatusError) as err:
                 if isinstance(err, HTTPStatusError) and err.response.status_code == 429:
                     self.logger.warning(f"HTTP 429 Too Many Requests: Waiting for {retry_delay} seconds before retrying (Attempt {attempt + 1}/{max_retries})...")
                     time.sleep(retry_delay)
@@ -164,8 +167,8 @@ class LoggerChatModel:
 class LLMResumer:
     def __init__(self, openai_api_key, strings):
         self.llm_cheap = LoggerChatModel(
-            ChatOpenAI(
-                model_name="gpt-4o-mini", openai_api_key=openai_api_key, temperature=0.4
+            ChatOllama(
+                model_name="gemma2", temperature=0.4
             )
         )
         self.strings = strings
